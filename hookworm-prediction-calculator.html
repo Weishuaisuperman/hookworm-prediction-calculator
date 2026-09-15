@@ -1,0 +1,1097 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>钩虫感染风险预测模型 | Hookworm Infection Risk Predictor</title>
+<style>
+  :root{
+    --bg:#f5f2ed;
+    --card:#ffffff;
+    --text:#333333;
+    --muted:#777777;
+    --border:#e0ddd8;
+    --red:#a23b3b;
+    --red-dark:#8a2f2f;
+    --red-accent:#c0392b;
+    --input-placeholder:#bbbbbb;
+    --disclaimer-bg:#fff8e1;
+    --disclaimer-border:#f0d78c;
+    --disclaimer-text:#856404;
+    --lo:#4a7c59;
+    --mid:#b8860b;
+    --hi:#c0392b;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text)}
+  body{
+    font-family:"Source Han Sans SC","Noto Sans SC","Microsoft YaHei","PingFang SC","Hiragino Sans GB",sans-serif;
+    font-size:15px;line-height:1.65;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;
+  }
+  .container{max-width:920px;margin:0 auto;padding:28px 20px 48px;}
+
+  /* 不同语言字体 */
+  html[data-lang="ar"] body{font-family:"Noto Naskh Arabic","Amiri","Segoe UI",sans-serif;direction:rtl;text-align:right}
+  html[data-lang="zh"] body, html[data-lang="vi"] body, html[data-lang="id"] body{font-family:"Source Han Sans SC","Noto Sans SC","Microsoft YaHei",sans-serif}
+  html[data-lang="ja"] body{font-family:"Noto Sans JP","Hiragino Sans","Meiryo",sans-serif}
+  html[data-lang="ko"] body{font-family:"Noto Sans KR","Malgun Gothic",sans-serif}
+  html[data-lang="th"] body{font-family:"Noto Sans Thai","Sarabun",sans-serif}
+  html[data-lang="ru"] body{font-family:"Noto Sans Cyrillic","PT Sans",sans-serif}
+  html[data-lang="en"] body, html[data-lang="fr"] body, html[data-lang="es"] body, html[data-lang="de"] body{
+    font-family:"Inter","Segoe UI","Roboto","Helvetica Neue",Arial,sans-serif;
+  }
+
+  /* —— 顶部红色 banner —— */
+  .hero{
+    background:var(--red);
+    border-radius:14px;
+    padding:32px 36px 28px;
+    color:#fff;
+    margin-bottom:28px;
+    position:relative;
+    box-shadow:0 6px 18px rgba(162,59,59,0.22);
+  }
+  .hero h1{margin:0;font-size:30px;font-weight:700;letter-spacing:0.6px}
+  .hero .subtitle-zh{margin-top:10px;font-size:16px;font-weight:400;opacity:0.95}
+  .hero .subtitle-en{margin-top:5px;font-size:13.5px;opacity:0.85;font-style:italic}
+
+  /* 语言切换按钮 */
+  .langbar{
+    position:absolute;
+    top:16px;
+    right:18px;
+    display:flex;flex-wrap:wrap;gap:5px;
+    justify-content:flex-end;max-width:420px;
+  }
+  .langbar button{
+    font-family:inherit;font-size:10.5px;
+    background:rgba(255,255,255,0.12);
+    border:1px solid rgba(255,255,255,0.55);
+    color:#fff;
+    padding:4px 7px;border-radius:3px;
+    cursor:pointer;line-height:1.25;min-width:52px;
+    transition:.15s;
+  }
+  .langbar button.on{background:#fff;color:var(--red);border-color:#fff;font-weight:700}
+  .langbar button:hover{background:rgba(255,255,255,0.25)}
+
+  /* —— 章节标题（红色竖条） —— */
+  .section-title{
+    display:flex;align-items:center;gap:10px;
+    margin:30px 0 16px;font-size:17px;font-weight:700;color:var(--text);
+  }
+  .section-title::before{
+    content:"";width:5px;height:22px;background:var(--red-accent);border-radius:3px;flex-shrink:0;
+  }
+  html[dir="rtl"] .section-title{flex-direction:row-reverse}
+  html[dir="rtl"] .section-title::before{margin-left:10px;margin-right:0}
+
+  /* —— 通用卡片 —— */
+  .card{
+    background:var(--card);
+    border:1px solid var(--border);
+    border-radius:12px;
+    padding:22px 24px;
+    box-shadow:0 2px 6px rgba(0,0,0,0.04);
+  }
+
+  /* —— 输入区 —— */
+  .inputs{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+  @media(max-width:760px){.inputs{grid-template-columns:repeat(2,1fr)}}
+  @media(max-width:480px){.inputs{grid-template-columns:1fr}}
+  .field{
+    background:var(--card);
+    border:1px solid var(--border);
+    border-radius:10px;
+    padding:14px 16px;
+    box-shadow:0 1px 3px rgba(0,0,0,0.03);
+    transition:border-color .15s;
+  }
+  .field:focus-within{border-color:var(--red-accent);box-shadow:0 1px 6px rgba(192,57,43,0.08)}
+  .field-header{
+    display:flex;justify-content:space-between;align-items:flex-start;gap:8px;
+    margin-bottom:8px;
+  }
+  html[dir="rtl"] .field-header{flex-direction:row-reverse}
+  .field-label{font-size:14px;font-weight:700;color:var(--text);line-height:1.4}
+  .field-hint{font-size:11px;color:var(--muted);white-space:nowrap}
+  .field input{
+    width:100%;border:none;border-bottom:1px solid #dcdcdc;
+    padding:6px 0 7px;font-size:18px;color:var(--text);background:transparent;outline:none;
+    font-feature-settings:"tnum" 1;
+  }
+  .field input::placeholder{color:var(--input-placeholder)}
+  .field input:focus{border-bottom-color:var(--red-accent)}
+
+  /* —— 按钮 —— */
+  .btnrow{margin-top:20px;display:flex;gap:12px;flex-wrap:wrap}
+  .btn{
+    font-family:inherit;font-size:14px;font-weight:500;
+    padding:11px 24px;border-radius:8px;cursor:pointer;
+    border:1px solid transparent;transition:.15s;
+  }
+  .btn-primary{background:var(--red-accent);color:#fff;border-color:var(--red-accent);box-shadow:0 3px 8px rgba(192,57,43,0.25)}
+  .btn-primary:hover{background:var(--red-dark)}
+  .btn-secondary{background:#fff;color:var(--text);border-color:var(--border)}
+  .btn-secondary:hover{border-color:var(--red-accent);color:var(--red-accent)}
+
+  /* —— 结果区 —— */
+  .result{display:none;margin-top:18px}
+  .result.show{display:block}
+  .prob-line{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:16px}
+  html[dir="rtl"] .prob-line{flex-direction:row-reverse;justify-content:flex-end}
+  .prob-num{font-size:48px;font-weight:700;color:var(--text);font-feature-settings:"tnum" 1;line-height:1}
+  .prob-unit{font-size:14px;color:var(--muted)}
+  .risk-badge{padding:5px 14px;font-size:13px;font-weight:700;border-radius:20px;color:#fff;letter-spacing:0.3px}
+  .risk-high{background:var(--hi)}
+  .risk-mid{background:var(--mid)}
+  .risk-low{background:var(--lo)}
+  .cutoff{font-size:12.5px;color:var(--muted);border:1px solid var(--border);padding:4px 10px;border-radius:4px;background:#fafafa}
+  html[dir="rtl"] .cutoff{margin-right:auto;margin-left:0}
+  html:not([dir="rtl"]) .cutoff{margin-left:auto}
+
+  .gauge{margin:18px 0 10px;position:relative;height:10px;background:linear-gradient(90deg,#d4e6d4 0%,#f1e6b3 40%,#f3c3b8 72%,#e07a7a 100%);border-radius:5px}
+  .gauge-fill{position:absolute;top:-3px;width:4px;height:16px;background:var(--text);border-radius:2px;transition:left .3s;box-shadow:0 1px 3px rgba(0,0,0,0.25)}
+  .gauge-ticks{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-top:8px;font-feature-settings:"tnum" 1}
+
+  .interp{margin-top:16px;font-size:13.5px;color:var(--muted);border-left:3px solid var(--red-accent);padding:8px 14px;background:#fff8f7}
+  html[dir="rtl"] .interp{border-left:none;border-right:3px solid var(--red-accent)}
+
+  .contrib{margin-top:20px}
+  .contrib h4{font-size:13.5px;font-weight:700;color:var(--text);margin:0 0 12px}
+  .crow{display:flex;align-items:center;gap:10px;margin-bottom:7px;font-size:12.5px}
+  html[dir="rtl"] .crow{flex-direction:row-reverse}
+  .crow .name{width:78px;font-weight:600;color:var(--text);flex-shrink:0;text-align:right}
+  html[dir="rtl"] .crow .name{text-align:left}
+  .crow .track{flex:1;position:relative;height:12px;background:#f2f2f2;border-radius:6px;overflow:hidden}
+  .crow .track::before{content:"";position:absolute;left:50%;top:0;bottom:0;width:1px;background:#ccc}
+  .crow .bar{position:absolute;top:1px;height:10px;border-radius:5px}
+  .crow .bar.pos{left:50%;background:var(--hi)}
+  .crow .bar.neg{right:50%;background:#3a6b8c}
+  .crow .val{width:64px;color:var(--muted);font-feature-settings:"tnum" 1;font-variant-numeric:tabular-nums}
+
+  /* —— 模型信息 —— */
+  .modelinfo-card{font-size:13px;color:var(--text);line-height:1.7}
+  .modelinfo-card p{margin:0 0 12px}
+  table.modelinfo{width:100%;border-collapse:collapse;margin:12px 0 16px;font-size:12.5px}
+  table.modelinfo th,table.modelinfo td{padding:8px 6px;text-align:center;border-bottom:1px solid var(--border);font-feature-settings:"tnum" 1}
+  table.modelinfo th{font-weight:700;background:#fafafa;color:var(--text);border-top:1px solid var(--border)}
+  table.modelinfo tr:last-child td{border-bottom:2px solid var(--red-accent)}
+  .modelinfo-card ul{margin:12px 0 0;padding-left:20px;color:var(--muted);font-size:12.5px}
+  html[dir="rtl"] .modelinfo-card ul{padding-left:0;padding-right:20px}
+  .modelinfo-card li{margin-bottom:5px}
+
+  /* —— 免责声明 —— */
+  .disclaimer{
+    margin-top:18px;background:var(--disclaimer-bg);
+    border:1px solid var(--disclaimer-border);border-left:4px solid var(--disclaimer-border);
+    border-radius:8px;padding:14px 18px;font-size:12.5px;color:var(--disclaimer-text);line-height:1.7;
+  }
+  html[dir="rtl"] .disclaimer{border-left:1px solid var(--disclaimer-border);border-right:4px solid var(--disclaimer-border)}
+  .disclaimer b{font-weight:700;color:#7a5c00}
+
+  footer{margin-top:30px;padding-top:14px;border-top:1px solid var(--border);
+         font-size:11.5px;color:var(--muted);text-align:center;letter-spacing:0.3px}
+</style>
+</head>
+<body>
+<div class="container">
+
+  <div class="hero">
+    <div class="langbar" id="langbar"></div>
+    <h1 data-i18n="docTitle">钩虫感染风险预测模型</h1>
+    <div class="subtitle-zh" data-i18n="subtitle">基于 9 项常规血常规指标的 Logistic 回归筛查工具</div>
+    <div class="subtitle-en">Hookworm Infection Risk Predictor — Logistic Regression on 9 Routine Blood Count Parameters</div>
+  </div>
+
+  <div class="section-title" data-i18n="sectionInputs">1. 输入指标</div>
+  <div class="inputs" id="inputs"></div>
+  <div class="btnrow">
+    <button class="btn btn-primary" id="btnCalc" onclick="predict()">计算感染风险</button>
+    <button class="btn btn-secondary" id="btnDemo" onclick="fillDemo()">填入示例值（训练集中位数）</button>
+    <button class="btn btn-secondary" id="btnClear" onclick="clearAll()">清空</button>
+  </div>
+
+  <div class="section-title" data-i18n="sectionResults">2. 预测结果</div>
+  <div class="card result" id="result">
+    <div class="prob-line">
+      <span class="prob-num" id="probNum">--</span>
+      <span class="prob-unit" data-i18n="probLabel">预测感染概率</span>
+      <span class="risk-badge" id="riskBadge">--</span>
+      <span class="cutoff" id="cutoffBadge">截断值 0.472</span>
+    </div>
+    <div class="gauge">
+      <div class="gauge-fill" id="gaugeFill"></div>
+    </div>
+    <div class="gauge-ticks"><span>0%</span><span>25%</span><span>50%</span><span>75%</span><span>100%</span></div>
+    <div class="interp" id="interp"></div>
+    <div class="contrib">
+      <h4 data-i18n="contribTitle">各指标对本次预测的贡献</h4>
+      <div id="contribRows"></div>
+    </div>
+  </div>
+
+  <div class="section-title" data-i18n="sectionModel">3. 模型信息</div>
+  <div class="card modelinfo-card">
+    <p data-i18n="modelDesc">模型描述……</p>
+    <table class="modelinfo">
+      <thead><tr>
+        <th data-i18n="tableH1">数据集</th>
+        <th data-i18n="tableH2">AUC (95% CI)</th>
+        <th data-i18n="tableH3">灵敏度</th>
+        <th data-i18n="tableH4">特异度</th>
+        <th data-i18n="tableH5">截断值</th>
+      </tr></thead>
+      <tbody>
+        <tr><td data-i18n="rowTrain">训练集</td><td>0.912 (0.880–0.942)</td><td>0.855</td><td>0.837</td><td>0.488</td></tr>
+        <tr><td data-i18n="rowTest">内部测试集</td><td>0.896 (0.833–0.946)</td><td>0.901</td><td>0.800</td><td>0.472</td></tr>
+        <tr><td data-i18n="rowExt">外部验证集</td><td>0.925 (0.885–0.961)</td><td>0.800</td><td>0.912</td><td>0.676</td></tr>
+      </tbody>
+    </table>
+    <ul>
+      <li data-i18n="modelNote1">截断值说明……</li>
+      <li data-i18n="modelNote2">主要信号说明……</li>
+    </ul>
+  </div>
+
+  <div class="section-title" data-i18n="sectionDisclaimer">4. 免责声明</div>
+  <div class="disclaimer" data-i18n="disclaimerText">免责声明……</div>
+
+  <footer data-i18n="footer">页脚</footer>
+</div>
+
+<script>
+const I18N = {
+  docTitle: {
+    'zh': '钩虫感染风险预测模型',
+    'en': 'Hookworm Infection Risk Predictor',
+    'vi': 'Mô hình dự đoán nguy cơ nhiễm giun móc',
+    'th': 'แบบจำลองทำนายความเสี่ยงติดเชื้อพยาธิปากขอ',
+    'id': 'Model Prediksi Risiko Infeksi Cacing Tambang',
+    'fr': 'Modèle de prédiction du risque d\'ankylostomiase',
+    'ru': 'Модель прогнозирования риска анкилостомидоза',
+    'es': 'Modelo de predicción del riesgo de anquilostomiasis',
+    'ar': 'نموذج التنبؤ بخطر الإصابة بالدودة الشصية',
+    'de': 'Risikovorhersagemodell für Hakenwurminfektionen',
+    'ja': '鉤虫感染症リスク予測モデル',
+    'ko': '구충 감염 위험 예측 모델',
+  },
+  subtitle: {
+    'zh': '基于 9 项常规血常规指标的 Logistic 回归筛查工具',
+    'en': 'Logistic Regression Screening Tool Based on 9 Routine Blood Count Parameters',
+    'vi': 'Công cụ sàng lọc hồi quy Logistic dựa trên 9 chỉ số công thức máu thường quy',
+    'th': 'เครื่องมือคัดกรองด้วย Logistic Regression จากค่าตรวจเลือดทั่วไป 9 รายการ',
+    'id': 'Alat skrining Regresi Logistik berdasarkan 9 parameter darah rutin',
+    'fr': 'Outil de dépistage par régression logistique à partir de 9 paramètres hématologiques courants',
+    'ru': 'Инструмент скрининга на основе логистической регрессии по 9 стандартным показателям крови',
+    'es': 'Herramienta de cribado mediante regresión logística basada en 9 parámetros hemáticos rutinarios',
+    'ar': 'أداة فحص بالانحدار اللوجستي بناءً على 9 معايير تعداد الدم الروتينية',
+    'de': 'Logistisches Regressions-Screening auf Basis von 9 Routine-Blutparametern',
+    'ja': '9 項目の通常血液検査指標に基づくロジスティック回帰スクリーニングツール',
+    'ko': '9가지 일반 혈액 검사 지표 기반 로지스틱 회귀 스크리닝 도구',
+  },
+  manuscript: {
+    'zh': '附属于论著：基于常规检验指标预测钩虫感染的机器学习模型构建与评价',
+    'en': 'Companion to: Construction and Evaluation of Machine-Learning Models for Hookworm Infection Prediction from Routine Laboratory Indices',
+    'vi': 'Phần kèm theo: Xây dựng và đánh giá các mô hình học máy dự đoán nhiễm giun móc từ các chỉ số xét nghiệm thường quy',
+    'th': 'ประกอบบทความ: การสร้างและประเมินแบบจำลองแมชชีนเลิร์นนิงทำนายการติดเชื้อพยาธิปากขอจากค่าตรวจทางห้องปฏิบัติการทั่วไป',
+    'id': 'Pendamping: Konstruksi dan Evaluasi Model Machine-Learning untuk Prediksi Infeksi Cacing Tambang dari Indeks Laboratorium Rutin',
+    'fr': 'Annexe à : Construction et évaluation de modèles d\'apprentissage automatique pour la prédiction de l\'ankylostomiase à partir d\'indices de laboratoire courants',
+    'ru': 'Приложение к статье: Построение и оценка моделей машинного обучения для прогнозирования анкилостомидоза по стандартным лабораторным показателям',
+    'es': 'Anexo a: Construcción y evaluación de modelos de aprendizaje automático para la predicción de la anquilostomiasis a partir de índices de laboratorio rutinarios',
+    'ar': 'ملحق للمقال: بناء وتقييم نماذج التعلم الآلي للتنبؤ بالإصابة بالدودة الشصية من المؤشرات المخبرية الروتينية',
+    'de': 'Begleitend zu: Konstruktion und Bewertung von Machine-Learning-Modellen zur Vorhersage von Hakenwurminfektionen aus Routinelaborindizes',
+    'ja': '原著付録：通常検査指標による鉤虫感染予測のための機械学習モデル構築と評価',
+    'ko': '부록: 일반 검사 지표를 이용한 구충 감염 예측 기계학습 모델 구축 및 평가',
+  },
+  sectionInputs: {
+    'zh': '输入血常规指标',
+    'en': 'Input Parameters',
+    'vi': 'Chỉ số đầu vào',
+    'th': 'ค่าตัวแปรนำเข้า',
+    'id': 'Parameter Masukan',
+    'fr': 'Paramètres d\'entrée',
+    'ru': 'Входные показатели',
+    'es': 'Parámetros de entrada',
+    'ar': 'معايير الإدخال',
+    'de': 'Eingabeparameter',
+    'ja': '入力指標',
+    'ko': '입력 지표',
+  },
+  sectionResults: {
+    'zh': '预测结果',
+    'en': 'Predicted Result',
+    'vi': 'Kết quả dự đoán',
+    'th': 'ผลการทำนาย',
+    'id': 'Hasil Prediksi',
+    'fr': 'Résultat prédit',
+    'ru': 'Результат прогноза',
+    'es': 'Resultado predicho',
+    'ar': 'النتيجة المتوقعة',
+    'de': 'Vorhergesagtes Ergebnis',
+    'ja': '予測結果',
+    'ko': '예측 결과',
+  },
+  sectionModel: {
+    'zh': '模型信息',
+    'en': 'Model Information',
+    'vi': 'Thông tin mô hình',
+    'th': 'ข้อมูลแบบจำลอง',
+    'id': 'Informasi Model',
+    'fr': 'Informations sur le modèle',
+    'ru': 'Информация о модели',
+    'es': 'Información del modelo',
+    'ar': 'معلومات النموذج',
+    'de': 'Modellinformationen',
+    'ja': 'モデル情報',
+    'ko': '모델 정보',
+  },
+  sectionDisclaimer: {
+    'zh': '免责声明',
+    'en': 'Disclaimer',
+    'vi': 'Miễn trừ trách nhiệm',
+    'th': 'ข้อจำกัดความรับผิดชอบ',
+    'id': 'Penafian',
+    'fr': 'Avis de non-responsabilité',
+    'ru': 'Отказ от ответственности',
+    'es': 'Aviso legal',
+    'ar': 'إخلاء المسؤولية',
+    'de': 'Haftungsausschluss',
+    'ja': '免責事項',
+    'ko': '면책 조항',
+  },
+  btnCalc: {
+    'zh': '计算感染风险',
+    'en': 'Calculate Infection Risk',
+    'vi': 'Tính nguy cơ nhiễm',
+    'th': 'คำนวณความเสี่ยงติดเชื้อ',
+    'id': 'Hitung Risiko Infeksi',
+    'fr': 'Calculer le risque d\'infection',
+    'ru': 'Рассчитать риск инфекции',
+    'es': 'Calcular riesgo de infección',
+    'ar': 'احسب خطر العدوى',
+    'de': 'Infektionsrisiko berechnen',
+    'ja': '感染リスクを計算',
+    'ko': '감염 위험 계산',
+  },
+  btnDemo: {
+    'zh': '填入示例值（训练集中位数）',
+    'en': 'Insert Demo Values (Training-set Medians)',
+    'vi': 'Điền giá trị mẫu (trung vị tập huấn luyện)',
+    'th': 'ใส่ค่าตัวอย่าง (ค่ามัธยฐานของชุดฝึก)',
+    'id': 'Isi Nilai Demo (Median Set Pelatihan)',
+    'fr': 'Valeurs de démonstration (médianes de l\'ensemble d\'apprentissage)',
+    'ru': 'Ввести примеры (медианы обучающей выборки)',
+    'es': 'Insertar valores de demo (medianas del conjunto de entrenamiento)',
+    'ar': 'إدراج القيم النموذجية (وسيط مجموعة التدريب)',
+    'de': 'Demo-Werte einfügen (Mediane des Trainingsdatensatzes)',
+    'ja': 'デモ値を入力（学習セット中央値）',
+    'ko': '데모 값 입력 (훈련 세트 중앙값)',
+  },
+  btnClear: {
+    'zh': '清空',
+    'en': 'Clear',
+    'vi': 'Xóa',
+    'th': 'ล้าง',
+    'id': 'Hapus',
+    'fr': 'Effacer',
+    'ru': 'Очистить',
+    'es': 'Borrar',
+    'ar': 'مسح',
+    'de': 'Leeren',
+    'ja': 'クリア',
+    'ko': '지우기',
+  },
+  probLabel: {
+    'zh': '预测感染概率',
+    'en': 'Predicted Infection Probability',
+    'vi': 'Xác suất nhiễm dự đoán',
+    'th': 'ความน่าจะเป็นของการติดเชื้อที่ทำนาย',
+    'id': 'Probabilitas Infeksi Prediksi',
+    'fr': 'Probabilité d\'infection prédite',
+    'ru': 'Предсказанная вероятность инфицирования',
+    'es': 'Probabilidad de infección predicha',
+    'ar': 'الاحتمال المتوقع للإصابة',
+    'de': 'Vorhergesagte Infektionswahrscheinlichkeit',
+    'ja': '予測感染確率',
+    'ko': '예측 감염 확률',
+  },
+  cutoffLabel: {
+    'zh': '筛查截断值',
+    'en': 'Screening Cut-off',
+    'vi': 'Ngưỡng sàng lọc',
+    'th': 'ค่าตัดคัดกรอง',
+    'id': 'Ambang Batas Skrining',
+    'fr': 'Seuil de dépistage',
+    'ru': 'Порог скрининга',
+    'es': 'Punto de corte de cribado',
+    'ar': 'عتبة الفحص',
+    'de': 'Screening-Schwellenwert',
+    'ja': 'スクリーニングカットオフ',
+    'ko': '선별 기준치',
+  },
+  riskHigh: {
+    'zh': '高风险 · 建议粪检',
+    'en': 'High Risk · Stool Examination Recommended',
+    'vi': 'Nguy cơ cao · Khuyến nghị xét nghiệm phân',
+    'th': 'ความเสี่ยงสูง · แนะนำตรวจอุจจาระ',
+    'id': 'Risiko Tinggi · Disarankan Pemeriksaan Tinja',
+    'fr': 'Risque élevé · Examen des selles recommandé',
+    'ru': 'Высокий риск · Рекомендуется анализ кала',
+    'es': 'Riesgo alto · Se recomienda examen de heces',
+    'ar': 'خطر مرتفع · يوصى بفحص البراز',
+    'de': 'Hohes Risiko · Stuhluntersuchung empfohlen',
+    'ja': '高リスク · 糞便検査を推奨',
+    'ko': '고위험 · 변 검사 권장',
+  },
+  riskMid: {
+    'zh': '中等风险 · 建议关注',
+    'en': 'Intermediate Risk · Clinical Vigilance Advised',
+    'vi': 'Nguy cơ trung bình · Theo dõi lâm sàng',
+    'th': 'ความเสี่ยงปานกลาง · แนะนำเฝ้าระวัง',
+    'id': 'Risiko Menengah · Disarankan Kewaspadaan Klinis',
+    'fr': 'Risque modéré · Vigilance clinique conseillée',
+    'ru': 'Средний риск · Рекомендуется клиническое наблюдение',
+    'es': 'Riesgo intermedio · Se recomienda vigilancia clínica',
+    'ar': 'خطر متوسط · يُنصح بالحذر السريري',
+    'de': 'Mittleres Risiko · Klinische Wachsamkeit empfohlen',
+    'ja': '中等度リスク · 経過観察を推奨',
+    'ko': '중등도 위험 · 임상적 주의 권장',
+  },
+  riskLow: {
+    'zh': '低风险',
+    'en': 'Low Risk',
+    'vi': 'Nguy cơ thấp',
+    'th': 'ความเสี่ยงต่ำ',
+    'id': 'Risiko Rendah',
+    'fr': 'Risque faible',
+    'ru': 'Низкий риск',
+    'es': 'Riesgo bajo',
+    'ar': 'خطر منخفض',
+    'de': 'Niedriges Risiko',
+    'ja': '低リスク',
+    'ko': '저위험',
+  },
+  interpHigh: {
+    'zh': '预测概率 {p}% 高于筛查截断值 {c}%（测试集灵敏度 0.901 / 特异度 0.800）。建议进一步完善粪便镜检或改良加藤法病原学检查以明确诊断。',
+    'en': 'Predicted probability {p}% exceeds the screening cut-off {c}% (test-set sensitivity 0.901 / specificity 0.800). Stool microscopy or the modified Kato-Katz technique is recommended for definitive diagnosis.',
+    'vi': 'Xác suất dự đoán {p}% vượt ngưỡng sàng lọc {c}% (độ nhạy tập kiểm 0,901 / độ đặc hiệu 0,800). Khuyến nghị soi phân hoặc kỹ thuật Kato-Katz cải tiến để xác định chẩn đoán.',
+    'th': 'ความน่าจะเป็นที่ทำนาย {p}% สูงกว่าค่าตัดคัดกรอง {c}% (ความไวชุดทดสอบ 0.901 / ความจำเพาะ 0.800). แนะนำตรวจอุจจาระด้วยกล้องจุลทรรศน์หรือเทคนิค Kato-Katz ดัดแปลงเพื่อยืนยันการวินิจฉัย.',
+    'id': 'Probabilitas prediksi {p}% melampaui ambang batas skrining {c}% (sensitivitas set uji 0,901 / spesifisitas 0,800). Pemeriksaan mikroskopis tinja atau teknik Kato-Katz termodifikasi direkomendasikan untuk diagnosis pasti.',
+    'fr': 'La probabilité prédite {p}% dépasse le seuil de dépistage {c}% (sensibilité du jeu de test 0,901 / spécificité 0,800). Un examen microscopique des selles ou la technique de Kato-Katz modifiée est recommandé pour un diagnostic définitif.',
+    'ru': 'Предсказанная вероятность {p}% превышает порог скрининга {c}% (чувствительность тестовой выборки 0,901 / специфичность 0,800). Для окончательного диагноза рекомендуется микроскопия кала или модифицированный метод Като-Кац.',
+    'es': 'La probabilidad predicha {p}% supera el punto de corte de cribado {c}% (sensibilidad del conjunto de prueba 0,901 / especificidad 0,800). Se recomienda microscopía de heces o la técnica de Kato-Katz modificada para el diagnóstico definitivo.',
+    'ar': 'الاحتمال المتوقع {p}% يتجاوز عتبة الفحص {c}% (حساسية مجموعة الاختبار 0.901 / النوعية 0.800). يوصى بفحص البراز بالمجهر أو تقنية كاتو-كاتز المعدلة للتشخيص النهائي.',
+    'de': 'Die vorhergesagte Wahrscheinlichkeit von {p}% übersteigt den Screening-Schwellenwert {c}% (Sensitivität des Testdatensatzes 0,901 / Spezifität 0,800). Eine Stuhlmikroskopie oder das modifizierte Kato-Katz-Verfahren wird zur definitiven Diagnose empfohlen.',
+    'ja': '予測確率 {p}% はスクリーニングカットオフ {c}% を超えています（テストセット感度 0.901 / 特異度 0.800）。確定診断には糞便顕微鏡検査または改良加藤法の実施を推奨します。',
+    'ko': '예측 확률 {p}%는 선별 기준치 {c}%를 초과합니다(테스트 세트 민감도 0.901 / 특이도 0.800). 확정 진단을 위해 변 현미경 검사 또는 변형 카토-카atz법을 권장합니다.',
+  },
+  interpLow: {
+    'zh': '预测概率 {p}% 低于筛查截断值 {c}%。模型阴性预测值约 0.80，尚不足以完全排除感染；如有流行区居住史、贫血或消化道症状，仍建议结合临床判断。',
+    'en': 'Predicted probability {p}% is below the screening cut-off {c}%. The negative predictive value is approximately 0.80, which is insufficient to entirely exclude infection; clinical correlation is advised when endemic exposure, anaemia, or gastrointestinal symptoms are present.',
+    'vi': 'Xác suất dự đoán {p}% thấp hơn ngưỡng sàng lọc {c}%. Giá trị dự đoán âm khoảng 0,80, chưa đủ để loại trừ nhiễm; nên kết hợp đánh giá lâm sàng khi có tiền sử sống vùng dịch, thiếu máu hoặc triệu chứng tiêu hóa.',
+    'th': 'ความน่าจะเป็นที่ทำนาย {p}% ต่ำกว่าค่าตัดคัดกรอง {c}%. ค่าพยากรณ์เชิงลบประมาณ 0.80 ยังไม่เพียงพอที่จะตัดการติดเชื้อออกทั้งหมด; หากมีประวัติอยู่ในพื้นที่ระบาด ภาวะโลหิตจาง หรืออาการทางเดินอาหาร ควรพิจารณาทางคลินิกร่วมด้วย.',
+    'id': 'Probabilitas prediksi {p}% di bawah ambang batas skrining {c}%. Nilai prediksi negatif sekitar 0,80, belum cukup untuk menyingkirkan infeksi; jika ada riwayat tinggal di daerah endemik, anemia, atau gejala gastrointestinal, tetap disarankan korelasi klinis.',
+    'fr': 'La probabilité prédite {p}% est inférieure au seuil de dépistage {c}%. La valeur prédictive négative est d\'environ 0,80, ce qui est insuffisant pour exclure totalement l\'infection ; une corrélation clinique est conseillée en cas d\'exposition en zone endémique, d\'anémie ou de symptômes gastro-intestinaux.',
+    'ru': 'Предсказанная вероятность {p}% ниже порога скрининга {c}%. Отрицательная прогностическая ценность составляет около 0,80 и недостаточна для полного исключения инфекции; при наличии анамнеза пребывания в эндемичном регионе, анемии или желудочно-кишечных симптомов рекомендуется клиническая корреляция.',
+    'es': 'La probabilidad predicha {p}% está por debajo del punto de corte de cribado {c}%. El valor predictivo negativo es aproximadamente 0,80, insuficiente para descartar completamente la infección; se recomienda correlación clínica ante exposición endémica, anemia o síntomas gastrointestinales.',
+    'ar': 'الاحتمال المتوقع {p}% أقل من عتبة الفحص {c}%. القيمة التنبؤية السلبية حوالي 0.80، وهي غير كافية لاستبعاد الإصابة بالكامل؛ في حال وجود تاريخ للتعرض في مناطق موبوءة أو فقر دم أو أعراض هضمية، يُنصح بالربط السريري.',
+    'de': 'Die vorhergesagte Wahrscheinlichkeit von {p}% liegt unter dem Screening-Schwellenwert {c}%. Der negative Vorhersagewert beträgt etwa 0,80 und reicht nicht aus, um eine Infektion sicher auszuschließen; bei Expositionsanamnese in Endemiegebieten, Anämie oder gastrointestinalen Symptomen ist eine klinische Korrelation ratsam.',
+    'ja': '予測確率 {p}% はスクリーニングカットオフ {c}% を下回っています。陰性的中率は約 0.80 で、感染を完全に除外するには十分ではありません。流行地域への居住歴、貧血、消化器症状がある場合は臨床的相関を考慮してください。',
+    'ko': '예측 확률 {p}%는 선별 기준치 {c}% 미만입니다. 음성 예측값은 약 0.80으로 감염을 완전히 배제하기에는 충분하지 않습니다. 풍토 지역 거주력, 빈혈, 위장관 증상이 있는 경우 임상적 상관관계 검토를 권장합니다.',
+  },
+  contribTitle: {
+    'zh': '各指标对本次预测的贡献（对 logit 的贡献值；红色＝推高风险，蓝色＝压低风险）',
+    'en': 'Per-feature contribution to this prediction (logit contribution; red = increases risk, blue = decreases risk)',
+    'vi': 'Đóng góp của từng chỉ số (logit; đỏ = tăng nguy cơ, xanh = giảm nguy cơ)',
+    'th': 'ส่วนร่วมของแต่ละตัวแปรต่อการทำนาย (logit; แดง = เพิ่มความเสี่ยง, น้ำเงิน = ลดความเสี่ยง)',
+    'id': 'Kontribusi setiap fitur terhadap prediksi (logit; merah = meningkatkan risiko, biru = menurunkan risiko)',
+    'fr': 'Contribution de chaque paramètre (logit ; rouge = augmente le risque, bleu = diminue le risque)',
+    'ru': 'Вклад каждого показателя (logit; красный = повышает риск, синий = снижает риск)',
+    'es': 'Contribución de cada variable (logit; rojo = aumenta el riesgo, azul = disminuye el riesgo)',
+    'ar': 'مساهمة كل متغير في هذا التنبؤ (logit؛ أحمر = يزيد الخطر، أزرق = يقلل الخطر)',
+    'de': 'Beitrag jedes Merkmals zur Vorhersage (Logit; rot = erhöht das Risiko, blau = senkt das Risiko)',
+    'ja': '各指標の予測への寄与（赤＝リスク上昇、青＝リスク低下）',
+    'ko': '각 지표의 예측 기여도 (logit; 빨강 = 위험 증가, 파랑 = 위험 감소)',
+  },
+  modelDesc: {
+    'zh': '模型：Logistic 回归（训练集标准化 + L2 正则化，C=100）；训练样本 n=343（7:3 分层随机划分）；特征经单因素 Logistic 回归、Boruta 与 LASSO 三法交集筛选。所有计算在浏览器本地完成，数据不上传。',
+    'en': 'Model: Logistic regression with training-set standardization and L2 regularisation (C=100); n=343 training samples (7:3 stratified split). Features were selected by intersection of univariate logistic regression, Boruta, and LASSO. All computations are performed locally in the browser; no data are uploaded.',
+    'vi': 'Mô hình: Hồi quy Logistic có chuẩn hóa tập huấn luyện và điều chuẩn L2 (C=100); n=343 mẫu huấn luyện (chia lớp 7:3). Đặc trưng được chọn bằng giao của hồi quy Logistic đơn biến, Boruta và LASSO. Mọi tính toán được thực hiện cục bộ trong trình duyệt; không tải dữ liệu lên.',
+    'th': 'แบบจำลอง: Logistic Regression พร้อมการปรับมาตรฐานชุดฝึกและการทำ regularization L2 (C=100); ตัวอย่างฝึก n=343 (แบ่งชั้น 7:3). คุณลักษณะถูกคัดเลือกด้วยจุดตัดของ univariate logistic regression, Boruta และ LASSO. การคำนวณทั้งหมดทำในเบราว์เซอร์; ไม่มีการอัปโหลดข้อมูล.',
+    'id': 'Model: Regresi Logistik dengan standarisasi set pelatihan dan regularisasi L2 (C=100); n=343 sampel pelatihan (split berstrata 7:3). Fitur dipilih melalui irisan regresi logistik univariat, Boruta, dan LASSO. Semua komputasi dilakukan secara lokal di peramban; tidak ada data yang diunggah.',
+    'fr': 'Modèle : régression logistique avec standardisation de l\'ensemble d\'apprentissage et régularisation L2 (C=100) ; n=343 échantillons d\'apprentissage (division stratifiée 7:3). Les variables ont été sélectionnées par l\'intersection de la régression logistique univariée, de Boruta et de LASSO. Tous les calculs sont effectués localement dans le navigateur ; aucune donnée n\'est téléchargée.',
+    'ru': 'Модель: логистическая регрессия со стандартизацией обучающей выборки и L2-регуляризацией (C=100); n=343 обучающих образцов (стратифицированное разделение 7:3). Признаки отобраны пересечением одномерной логистической регрессии, Boruta и LASSO. Все вычисления выполняются локально в браузере; данные не передаются.',
+    'es': 'Modelo: regresión logística con estandarización del conjunto de entrenamiento y regularización L2 (C=100); n=343 muestras de entrenamiento (división estratificada 7:3). Las variables se seleccionaron mediante la intersección de regresión logística univariante, Boruta y LASSO. Todos los cálculos se realizan localmente en el navegador; no se suben datos.',
+    'ar': 'النموذج: انحدار لوجستي مع توحيد مجموعة التدريب وتنظيم L2 (C=100)؛ n=343 عينة تدريب (تقسيم طبقي 7:3). تم اختيار المتغيرات عبر تقاطع الانحدار اللوجستي أحادي المتغير، Boruta، و LASSO. جميع الحسابات تتم محليًا في المتصفح؛ لا يتم رفع أي بيانات.',
+    'de': 'Modell: Logistische Regression mit Standardisierung des Trainingsdatensatzes und L2-Regularisierung (C=100); n=343 Trainingsstichproben (stratifizierte 7:3-Aufteilung). Die Merkmale wurden durch die Schnittmenge von univariater logistischer Regression, Boruta und LASSO ausgewählt. Alle Berechnungen erfolgen lokal im Browser; es werden keine Daten hochgeladen.',
+    'ja': 'モデル：学習セット標準化 + L2 正則化（C=100）付きロジスティック回帰。学習標本 n=343（層化 7:3 分割）。特徴量は単変量ロジスティック回帰、Boruta、LASSO の交差により選択。すべての計算はブラウザ内でローカルに実行され、データはアップロードされません。',
+    'ko': '모델: 훈련 세트 표준화 + L2 정규화(C=100) 로지스틱 회귀; 훈련 표본 n=343(층화 7:3 분할). 변수는 단변량 로지스틱 회귀, Boruta, LASSO의 교집합으로 선정. 모든 계산은 브라우저에서 로컬로 수행되며 데이터는 업로드되지 않습니다.',
+  },
+  tableH1: {
+    'zh': '数据集',
+    'en': 'Dataset',
+    'vi': 'Tập dữ liệu',
+    'th': 'ชุดข้อมูล',
+    'id': 'Dataset',
+    'fr': 'Jeu de données',
+    'ru': 'Набор данных',
+    'es': 'Conjunto de datos',
+    'ar': 'مجموعة البيانات',
+    'de': 'Datensatz',
+    'ja': 'データセット',
+    'ko': '데이터 세트',
+  },
+  tableH2: {
+    'zh': 'AUC (95% CI)',
+    'en': 'AUC (95% CI)',
+    'vi': 'AUC (95% CI)',
+    'th': 'AUC (95% CI)',
+    'id': 'AUC (95% CI)',
+    'fr': 'AUC (IC 95%)',
+    'ru': 'AUC (95% ДИ)',
+    'es': 'AUC (IC 95%)',
+    'ar': 'AUC (95% CI)',
+    'de': 'AUC (95% KI)',
+    'ja': 'AUC (95% CI)',
+    'ko': 'AUC (95% CI)',
+  },
+  tableH3: {
+    'zh': '灵敏度',
+    'en': 'Sensitivity',
+    'vi': 'Độ nhạy',
+    'th': 'ความไว',
+    'id': 'Sensitivitas',
+    'fr': 'Sensibilité',
+    'ru': 'Чувствительность',
+    'es': 'Sensibilidad',
+    'ar': 'الحساسية',
+    'de': 'Sensitivität',
+    'ja': '感度',
+    'ko': '민감도',
+  },
+  tableH4: {
+    'zh': '特异度',
+    'en': 'Specificity',
+    'vi': 'Độ đặc hiệu',
+    'th': 'ความจำเพาะ',
+    'id': 'Spesifisitas',
+    'fr': 'Spécificité',
+    'ru': 'Специфичность',
+    'es': 'Especificidad',
+    'ar': 'النوعية',
+    'de': 'Spezifität',
+    'ja': '特異度',
+    'ko': '특이도',
+  },
+  tableH5: {
+    'zh': '截断值',
+    'en': 'Cut-off',
+    'vi': 'Ngưỡng',
+    'th': 'ค่าตัด',
+    'id': 'Ambang',
+    'fr': 'Seuil',
+    'ru': 'Порог',
+    'es': 'Punto de corte',
+    'ar': 'عتبة',
+    'de': 'Schwellenwert',
+    'ja': 'カットオフ',
+    'ko': '기준치',
+  },
+  rowTrain: {
+    'zh': '训练集 (n=343)',
+    'en': 'Training set (n=343)',
+    'vi': 'Tập huấn luyện (n=343)',
+    'th': 'ชุดฝึก (n=343)',
+    'id': 'Set pelatihan (n=343)',
+    'fr': 'Ensemble d\'apprentissage (n=343)',
+    'ru': 'Обучающая выборка (n=343)',
+    'es': 'Conjunto de entrenamiento (n=343)',
+    'ar': 'مجموعة التدريب (n=343)',
+    'de': 'Trainingsdatensatz (n=343)',
+    'ja': '学習セット (n=343)',
+    'ko': '훈련 세트 (n=343)',
+  },
+  rowTest: {
+    'zh': '内部测试集 (n=146)',
+    'en': 'Internal test set (n=146)',
+    'vi': 'Tập kiểm tra nội bộ (n=146)',
+    'th': 'ชุดทดสอบภายใน (n=146)',
+    'id': 'Set uji internal (n=146)',
+    'fr': 'Jeu de test interne (n=146)',
+    'ru': 'Внутренняя тестовая выборка (n=146)',
+    'es': 'Conjunto de prueba interno (n=146)',
+    'ar': 'مجموعة الاختبار الداخلية (n=146)',
+    'de': 'Interner Testdatensatz (n=146)',
+    'ja': '内部テストセット (n=146)',
+    'ko': '내부 테스트 세트 (n=146)',
+  },
+  rowExt: {
+    'zh': '外部验证集 (n=160)',
+    'en': 'External validation set (n=160)',
+    'vi': 'Tập xác nhận ngoài (n=160)',
+    'th': 'ชุดตรวจสอบภายนอก (n=160)',
+    'id': 'Set validasi eksternal (n=160)',
+    'fr': 'Ensemble de validation externe (n=160)',
+    'ru': 'Внешняя проверочная выборка (n=160)',
+    'es': 'Conjunto de validación externa (n=160)',
+    'ar': 'مجموعة التحقق الخارجية (n=160)',
+    'de': 'Externer Validierungsdatensatz (n=160)',
+    'ja': '外部検証セット (n=160)',
+    'ko': '외부 검증 세트 (n=160)',
+  },
+  modelNote1: {
+    'zh': '截断值 0.472 为内部测试集约登指数最优阈值，侧重灵敏度（减少漏筛）；外部验证人群中概率整体分布略有下移，临床使用时建议结合当地流行率校准。',
+    'en': 'The cut-off of 0.472 corresponds to the maximal Youden index in the internal test set, prioritising sensitivity (minimising false negatives); the predicted probability distribution is slightly downshifted in the external population, and local prevalence-based calibration is recommended for clinical use.',
+    'vi': 'Ngưỡng 0,472 tương ứng chỉ số Youden tối đa trên tập kiểm tra nội bộ, ưu tiên độ nhạy (giảm âm tính giả); phân phối xác suất ở quần thể ngoài hơi lệch xuống, nên hiệu chỉnh theo tỉ lệ hiện mắc tại địa phương khi dùng lâm sàng.',
+    'th': 'ค่าตัด 0.472 สอดคล้องกับดัชนี Youden สูงสุดในชุดทดสอบภายใน โดยให้ความสำคัญกับความไว (ลดผลลบลวง); การกระจายความน่าจะเป็นในประชากรภายนอกเลื่อนลงเล็กน้อย จึงแนะนำปรับเทียบตามความชุกของท้องถิ่นเมื่อใช้ทางคลินิก.',
+    'id': 'Ambang 0,472 sesuai indeks Youden maksimum pada set uji internal, memprioritaskan sensitivitas (meminimalkan negatif palsu); distribusi probabilitas pada populasi eksternal bergeser sedikit ke bawah, sehingga kalibrasi berbasis prevalensi setempat disarankan untuk penggunaan klinis.',
+    'fr': 'Le seuil de 0,472 correspond à l\'indice de Youden maximal dans le jeu de test interne, privilégiant la sensibilité (minimisation des faux négatifs) ; la distribution des probabilités prédites est légèrement décalée vers le bas dans la population externe, et un étalonnage basé sur la prévalence locale est recommandé pour l\'usage clinique.',
+    'ru': 'Порог 0,472 соответствует максимальному индексу Юдена во внутренней тестовой выборке с приоритетом чувствительности (минимизация ложноотрицательных результатов); распределение вероятностей во внешней популяции слегка смещено вниз, поэтому для клинического применения рекомендуется калибровка по местной распространённости.',
+    'es': 'El punto de corte de 0,472 corresponde al índice de Youden máximo en el conjunto de prueba interno, priorizando la sensibilidad (minimización de falsos negativos); la distribución de probabilidad predicha está ligeramente desplazada hacia abajo en la población externa, por lo que se recomienda una calibración basada en la prevalencia local para uso clínico.',
+    'ar': 'عتبة 0.472 تطابق مؤشر Youden الأقصى في مجموعة الاختبار الداخلية، مع إعطاء الأولوية للحساسية (تقليل السلبيات الكاذبة)؛ يتوزع الاحتمال المتوقع في السكان الخارجيين بانخفاض طفيف، لذا يُوصى بالمعايرة بناءً على الانتشار المحلي للاستخدام السريري.',
+    'de': 'Der Schwellenwert von 0,472 entspricht dem maximalen Youden-Index im internen Testdatensatz mit Priorität auf Sensitivität (Minimierung falsch-negativer Befunde); die Wahrscheinlichkeitsverteilung verschiebt sich in der externen Population leicht nach unten, daher wird für den klinischen Einsatz eine Kalibrierung anhand der lokalen Prävalenz empfohlen.',
+    'ja': 'カットオフ値 0.472 は内部テストセットにおける最大 Youden 指数に対応し、感度（偽陰性の最小化）を優先します。外部集団では予測確率の分布がやや下方に偏移するため、臨床使用時は地域有病率に基づくキャリブレーションを推奨します。',
+    'ko': '기준치 0.472는 내부 테스트 세트의 최대 Youden 지수에 해당하며 민감도(위음성 최소화)를 우선시합니다. 외부 집단에서 예측 확률 분포가 약간 하향 이동하므로 임상 사용 시 지역 유병률 기반 보정을 권장합니다.',
+  },
+  modelNote2: {
+    'zh': '模型主要依赖的信号：嗜酸粒细胞反应（EO#、ELR↑）、炎症偏移（NLR↑）与慢性失血性贫血（HCT↓、MCV↓）。',
+    'en': 'Dominant signals: eosinophilic response (EO#, ELR ↑), inflammatory shift (NLR ↑), and chronic blood-loss anaemia (HCT ↓, MCV ↓).',
+    'vi': 'Tín hiệu chính: phản ứng tăng bạch cầu ái toan (EO#, ELR ↑), chuyển dịch viêm (NLR ↑), thiếu máu mất máu mạn (HCT ↓, MCV ↓).',
+    'th': 'สัญญาณหลัก: การตอบสนองของอีโอซิโนฟิล (EO#, ELR ↑), การเปลี่ยนแปลงการอักเสบ (NLR ↑) และภาวะโลหิตจางจากการเสียเลือดเรื้อรัง (HCT ↓, MCV ↓).',
+    'id': 'Sinyal dominan: respons eosinofilik (EO#, ELR ↑), pergeseran inflamasi (NLR ↑), dan anemia akibat kehilangan darah kronis (HCT ↓, MCV ↓).',
+    'fr': 'Signaux dominants : réponse éosinophilique (EO#, ELR ↑), décalage inflammatoire (NLR ↑) et anémie par perte sanguine chronique (HCT ↓, MCV ↓).',
+    'ru': 'Основные сигналы: эозинофильный ответ (EO#, ELR ↑), воспалительный сдвиг (NLR ↑) и хроническая постгеморрагическая анемия (HCT ↓, MCV ↓).',
+    'es': 'Señales dominantes: respuesta eosinofílica (EO#, ELR ↑), desviación inflamatoria (NLR ↑) y anemia por pérdida sanguínea crónica (HCT ↓, MCV ↓).',
+    'ar': 'الإشارات المهيمنة: الاستجابة اليوزينية (EO#, ELR ↑)، التحول الالتهابي (NLR ↑)، وفقر الدم الناتج عن فقدان الدم المزمن (HCT ↓, MCV ↓).',
+    'de': 'Dominante Signale: eosinophile Reaktion (EO#, ELR ↑), inflammatorische Verschiebung (NLR ↑) und chronische Blutungsanämie (HCT ↓, MCV ↓).',
+    'ja': '主要シグナル：好酸球反応（EO#、ELR ↑）、炎症シフト（NLR ↑）、慢性失血性貧血（HCT ↓、MCV ↓）。',
+    'ko': '주요 신호: 호산구 반응(EO#, ELR ↑), 염증성 이동(NLR ↑), 만성 실혈성 빈혈(HCT ↓, MCV ↓).',
+  },
+  disclaimerText: {
+    'zh': '本工具为研究用途的筛查辅助工具，输出结果不构成医学诊断。钩虫感染确诊依赖粪便镜检/改良加藤法。高风险者建议进一步完善病原学检查；低风险不能排除感染（模型 NPV≈0.80）。请勿用于替代临床医师判断。',
+    'en': 'This tool is a research-grade screening aid and does not constitute a medical diagnosis. Definitive diagnosis of hookworm infection relies on stool microscopy or the modified Kato-Katz technique. High-risk individuals should undergo confirmatory parasitological examination; a low-risk result does not exclude infection (model NPV ≈ 0.80). It is not intended to replace clinical judgement.',
+    'vi': 'Công cụ này là hỗ trợ sàng lọc cấp nghiên cứu, không thay thế chẩn đoán y khoa. Chẩn đoán xác định nhiễm giun móc dựa vào soi phân hoặc Kato-Katz cải tiến. Người nguy cơ cao cần xét nghiệm ký sinh trùng xác nhận; kết quả nguy cơ thấp không loại trừ nhiễm (NPV ≈ 0,80). Không thay thế phán đoán lâm sàng.',
+    'th': 'เครื่องมือนี้เป็นตัวช่วยคัดกรองระดับการวิจัย ไม่ใช่การวินิจฉัยทางการแพทย์ การวินิจฉัยขั้นสุดท้ายของการติดเชื้อพยาธิปากขอต้องอาศัยกล้องจุลทรรศน์อุจจาระหรือเทคนิค Kato-Katz ดัดแปลง ผู้ที่มีความเสี่ยงสูงควรตรวจยืนยันทางปรสิตวิทยา ผลเสี่ยงต่ำไม่ตัดการติดเชื้อ (NPV ≈ 0.80) ไม่ควรทดแทนการตัดสินทางคลินิก.',
+    'id': 'Alat ini merupakan alat bantu skrining tingkat penelitian dan bukan diagnosis medis. Diagnosis pasti infeksi cacing tambang bergantung pada mikroskopis tinja atau teknik Kato-Katz termodifikasi. Individu berisiko tinggi disarankan menjalani pemeriksaan parasitologi konfirmatif; hasil berisiko rendah tidak menyingkirkan infeksi (NPV ≈ 0,80). Tidak menggantikan penilaian klinis.',
+    'fr': 'Cet outil est une aide au dépistage de niveau recherche et ne constitue pas un diagnostic médical. Le diagnostic définitif de l\'ankylostomiase repose sur la microscopie des selles ou la technique de Kato-Katz modifiée. Les sujets à haut risque doivent bénéficier d\'un examen parasitologique de confirmation ; un résultat à faible risque n\'exclut pas l\'infection (VPN ≈ 0,80). Il ne remplace pas le jugement clinique.',
+    'ru': 'Этот инструмент является исследовательским средством скрининга и не является медицинским диагнозом. Окончательный диагноз анкилостомидоза основывается на микроскопии кала или модифицированном методе Като-Кац. Лицам из группы высокого риска рекомендуется подтверждающее паразитологическое исследование; результат низкого риска не исключает инфекцию (NPV ≈ 0,80). Инструмент не заменяет клиническое суждение.',
+    'es': 'Esta herramienta es una ayuda de cribado de nivel investigador y no constituye un diagnóstico médico. El diagnóstico definitivo de la anquilostomiasis se basa en la microscopía de heces o en la técnica de Kato-Katz modificada. Los individuos de alto riesgo deben someterse a un examen parasitológico confirmatorio; un resultado de bajo riesgo no excluye la infección (VPN ≈ 0,80). No sustituye al juicio clínico.',
+    'ar': 'هذه الأداة مساعدة فحص بمستوى بحثي ولا تشكل تشخيصًا طبيًا. يعتمد التشخيص النهائي للإصابة بالدودة الشصية على فحص البراز بالمجهر أو تقنية كاتو-كاتز المعدلة. يُنصح الأفراد عاليو الخطر بإجراء فحص طفيلي تأكيدي؛ والنتيجة منخفضة الخطر لا تستبعد العدوى (NPV ≈ 0.80). لا تحل محل الحكم السريري.',
+    'de': 'Dieses Werkzeug ist eine Screening-Hilfe auf Forschungsebene und stellt keine medizinische Diagnose dar. Die endgültige Diagnose einer Hakenwurminfektion beruht auf der Stuhlmikroskopie oder dem modifizierten Kato-Katz-Verfahren. Hochrisikopersonen sollten eine bestätigende parasitologische Untersuchung erhalten; ein Niedrigrisikoergebnis schließt eine Infektion nicht aus (NPV ≈ 0,80). Es ersetzt nicht die klinische Beurteilung.',
+    'ja': '本ツールは研究レベルのスクリーニング補助であり、医学的診断を構成するものではありません。鉤虫感染の確定診断は糞便顕微鏡検査または改良加藤法に依存します。高リスク者は確定のための寄生虫学的検査を受けることを推奨します。低リスク結果は感染を完全に除外するものではなく（モデル NPV ≈ 0.80）、臨床判断の代わりにはなりません。',
+    'ko': '본 도구는 연구 수준의 선별 보조 도구이며 의학적 진단을 구성하지 않습니다. 구충 감염의 확정 진단은 변 현미경 검사 또는 변형 카토-카atz법에 의존합니다. 고위험자는 확인 기생충학적 검사를 받아야 하며, 저위험 결과는 감염을 배제하지 않습니다(모델 NPV ≈ 0.80). 임상적 판단을 대체하지 않습니다.',
+  },
+  alertMissing: {
+    'zh': '请完整填写全部 9 项指标（可点击"填入示例值"快速体验）。',
+    'en': 'Please complete all 9 parameters (or click "Insert Demo Values" for a quick demonstration).',
+    'vi': 'Vui lòng điền đủ 9 chỉ số (hoặc nhấp "Điền giá trị mẫu" để trải nghiệm nhanh).',
+    'th': 'โปรดกรอกค่าทั้ง 9 รายการให้ครบ (หรือคลิก "ใส่ค่าตัวอย่าง" เพื่อทดลองอย่างรวดเร็ว).',
+    'id': 'Harap lengkapi 9 parameter (atau klik "Isi Nilai Demo" untuk demo cepat).',
+    'fr': 'Veuillez renseigner les 9 paramètres (ou cliquer sur "Valeurs de démonstration" pour un essai rapide).',
+    'ru': 'Пожалуйста, заполните все 9 показателей (или нажмите «Ввести примеры» для быстрой демонстрации).',
+    'es': 'Complete los 9 parámetros (o pulse "Insertar valores de demo" para una demostración rápida).',
+    'ar': 'يرجى إكمال جميع المعايير التسعة (أو انقر "إدراج القيم النموذجية" لتجربة سريعة).',
+    'de': 'Bitte alle 9 Parameter ausfüllen (oder auf "Demo-Werte einfügen" für eine schnelle Demonstration klicken).',
+    'ja': '9 項目すべての指標を入力してください（「デモ値を入力」でクイック表示）。',
+    'ko': '9개 지표를 모두 입력해 주세요 (또는 "데모 값 입력"을 클릭해 빠른 데모를 확인하세요).',
+  },
+  footer: {
+    'zh': '钩虫感染风险预测模型 · Logistic 回归 (9 特征) · 仅供研究使用',
+    'en': 'Hookworm Infection Risk Predictor · Logistic Regression (9 features) · For research use only',
+    'vi': 'Mô hình dự đoán nguy cơ nhiễm giun móc · Logistic Regression (9 đặc trưng) · Chỉ dùng cho nghiên cứu',
+    'th': 'แบบจำลองทำนายความเสี่ยงติดเชื้อพยาธิปากขอ · Logistic Regression (9 คุณลักษณะ) · ใช้สำหรับการวิจัยเท่านั้น',
+    'id': 'Model Prediksi Risiko Infeksi Cacing Tambang · Regresi Logistik (9 fitur) · Hanya untuk riset',
+    'fr': 'Modèle de prédiction du risque d\'ankylostomiase · Régression logistique (9 variables) · Réservé à la recherche',
+    'ru': 'Модель прогнозирования риска анкилостомидоза · Логистическая регрессия (9 признаков) · Только для исследовательских целей',
+    'es': 'Modelo de predicción del riesgo de anquilostomiasis · Regresión logística (9 variables) · Solo para investigación',
+    'ar': 'نموذج التنبؤ بخطر الإصابة بالدودة الشصية · الانحدار اللوجستي (9 متغيرات) · لأغراض البحث فقط',
+    'de': 'Risikovorhersagemodell für Hakenwurminfektionen · Logistische Regression (9 Merkmale) · Nur für Forschungszwecke',
+    'ja': '鉤虫感染症リスク予測モデル · ロジスティック回帰（9 特徴量） · 研究目的のみ',
+    'ko': '구충 감염 위험 예측 모델 · 로지스틱 회귀 (9개 변수) · 연구용으로만 사용',
+  },
+  fld_NLR: {
+    'zh': 'NLR 中性粒/淋巴细胞比值',
+    'en': 'NLR Neutrophil-to-Lymphocyte Ratio',
+    'vi': 'NLR Tỷ lệ bạch cầu trung tính/lympho',
+    'th': 'NLR อัตราส่วนนิวโทรฟิลต่อลิมโฟไซต์',
+    'id': 'NLR Rasio Neutrofil-Limfosit',
+    'fr': 'NLR Rapport neutrophiles/lymphocytes',
+    'ru': 'NLR Соотношение нейтрофилов и лимфоцитов',
+    'es': 'NLR Cociente neutrófilos/linfocitos',
+    'ar': 'NLR نسبة العدلات إلى الخلايا الليمفاوية',
+    'de': 'NLR Neutrophilen-zu-Lymphozyten-Verhältnis',
+    'ja': 'NLR 好中球/リンパ球比',
+    'ko': 'NLR 호중구-림프구 비율',
+  },
+  fld_EO: {
+    'zh': 'EO# 嗜酸粒细胞计数',
+    'en': 'EO# Eosinophil Count',
+    'vi': 'EO# Số lượng bạch cầu ái toan',
+    'th': 'EO# จำนวนอีโอซิโนฟิล',
+    'id': 'EO# Jumlah Eosinofil',
+    'fr': 'EO# Numération des éosinophiles',
+    'ru': 'EO# Число эозинофилов',
+    'es': 'EO# Recuento de eosinófilos',
+    'ar': 'EO# عدد الحمضات',
+    'de': 'EO# Eosinophilenzahl',
+    'ja': 'EO# 好酸球数',
+    'ko': 'EO# 호산구 수',
+  },
+  fld_ELR: {
+    'zh': 'ELR 嗜酸粒/淋巴细胞比值',
+    'en': 'ELR Eosinophil-to-Lymphocyte Ratio',
+    'vi': 'ELR Tỷ lệ bạch cầu ái toan/lympho',
+    'th': 'ELR อัตราส่วนอีโอซิโนฟิลต่อลิมโฟไซต์',
+    'id': 'ELR Rasio Eosinofil-Limfosit',
+    'fr': 'ELR Rapport éosinophiles/lymphocytes',
+    'ru': 'ELR Соотношение эозинофилов и лимфоцитов',
+    'es': 'ELR Cociente eosinófilos/linfocitos',
+    'ar': 'ELR نسبة الحمضات إلى الخلايا الليمفاوية',
+    'de': 'ELR Eosinophilen-zu-Lymphozyten-Verhältnis',
+    'ja': 'ELR 好酸球/リンパ球比',
+    'ko': 'ELR 호산구-림프구 비율',
+  },
+  fld_HCT: {
+    'zh': 'HCT 红细胞压积',
+    'en': 'HCT Haematocrit',
+    'vi': 'HCT Hematocrit',
+    'th': 'HCT ฮีมาโตคริต',
+    'id': 'HCT Hematokrit',
+    'fr': 'HCT Hématocrite',
+    'ru': 'HCT Гематокрит',
+    'es': 'HCT Hematocrito',
+    'ar': 'HCT الهيماتوكريت',
+    'de': 'HCT Hämatokrit',
+    'ja': 'HCT ヘマトクリット',
+    'ko': 'HCT 적혈구용적률',
+  },
+  fld_LYMPH: {
+    'zh': 'LYMPH# 淋巴细胞计数',
+    'en': 'LYMPH# Lymphocyte Count',
+    'vi': 'LYMPH# Số lượng tế bào lympho',
+    'th': 'LYMPH# จำนวนลิมโฟไซต์',
+    'id': 'LYMPH# Jumlah Limfosit',
+    'fr': 'LYMPH# Numération lymphocytaire',
+    'ru': 'LYMPH# Число лимфоцитов',
+    'es': 'LYMPH# Recuento de linfocitos',
+    'ar': 'LYMPH# عدد الخلايا الليمفاوية',
+    'de': 'LYMPH# Lymphozytenzahl',
+    'ja': 'LYMPH# リンパ球数',
+    'ko': 'LYMPH# 림프구 수',
+  },
+  fld_MCV: {
+    'zh': 'MCV 平均红细胞体积',
+    'en': 'MCV Mean Corpuscular Volume',
+    'vi': 'MCV Thể tích trung bình hồng cầu',
+    'th': 'MCV ปริมาตรเม็ดเลือดแดงเฉลี่ย',
+    'id': 'MCV Volume Eritrosit Rerata',
+    'fr': 'MCV Volume globulaire moyen',
+    'ru': 'MCV Средний объём эритроцита',
+    'es': 'MCV Volumen corpuscular medio',
+    'ar': 'MCV متوسط حجم الكرية',
+    'de': 'MCV Mittleres Erythrozytenvolumen',
+    'ja': 'MCV 平均赤血球容積',
+    'ko': 'MCV 평균 적혈구 용적',
+  },
+  fld_PLR: {
+    'zh': 'PLR 血小板/淋巴细胞比值',
+    'en': 'PLR Platelet-to-Lymphocyte Ratio',
+    'vi': 'PLR Tỷ lệ tiểu cầu/lympho',
+    'th': 'PLR อัตราส่วนเกล็ดเลือดต่อลิมโฟไซต์',
+    'id': 'PLR Rasio Trombosit-Limfosit',
+    'fr': 'PLR Rapport plaquettes/lymphocytes',
+    'ru': 'PLR Соотношение тромбоцитов и лимфоцитов',
+    'es': 'PLR Cociente plaquetas/linfocitos',
+    'ar': 'PLR نسبة الصفائح إلى الخلايا الليمفاوية',
+    'de': 'PLR Thrombozyten-zu-Lymphozyten-Verhältnis',
+    'ja': 'PLR 血小板/リンパ球比',
+    'ko': 'PLR 혈소판-림프구 비율',
+  },
+  fld_BASO: {
+    'zh': 'BASO# 嗜碱粒细胞计数',
+    'en': 'BASO# Basophil Count',
+    'vi': 'BASO# Số lượng bạch cầu ái kiềm',
+    'th': 'BASO# จำนวนเบโซฟิล',
+    'id': 'BASO# Jumlah Basofil',
+    'fr': 'BASO# Numération des basophiles',
+    'ru': 'BASO# Число базофилов',
+    'es': 'BASO# Recuento de basófilos',
+    'ar': 'BASO# عدد الخلايا القاعدية',
+    'de': 'BASO# Basophilenzahl',
+    'ja': 'BASO# 好塩基球数',
+    'ko': 'BASO# 호염기구 수',
+  },
+  fld_WBC: {
+    'zh': 'WBC 白细胞计数',
+    'en': 'WBC White Blood Cell Count',
+    'vi': 'WBC Số lượng bạch cầu',
+    'th': 'WBC จำนวนเม็ดเลือดขาว',
+    'id': 'WBC Jumlah Leukosit',
+    'fr': 'WBC Numération leucocytaire',
+    'ru': 'WBC Число лейкоцитов',
+    'es': 'WBC Recuento leucocitario',
+    'ar': 'WBC عدد كريات الدم البيضاء',
+    'de': 'WBC White Blood Cell Count',
+    'ja': 'WBC 白血球数',
+    'ko': 'WBC 백혈구 수',
+  },
+  hint_NLR: {
+    'zh': '训练集中位数 2.14',
+    'en': 'Training median 2.14',
+    'vi': 'Trung vị huấn luyện 2,14',
+    'th': 'ค่ามัธยฐานการฝึก 2.14',
+    'id': 'Median pelatihan 2,14',
+    'fr': 'Médiane d\'apprentissage 2,14',
+    'ru': 'Медиана обучения 2,14',
+    'es': 'Mediana de entrenamiento 2,14',
+    'ar': 'وسيط التدريب 2.14',
+    'de': 'Trainingsmedian 2,14',
+    'ja': '学習セット中央値 2.14',
+    'ko': '훈련 중앙값 2.14',
+  },
+  hint_EO: {
+    'zh': '×10⁹/L · 中位数 0.15',
+    'en': '×10⁹/L · Median 0.15',
+    'vi': '×10⁹/L · Trung vị 0,15',
+    'th': '×10⁹/L · ค่ามัธยฐาน 0.15',
+    'id': '×10⁹/L · Median 0,15',
+    'fr': '×10⁹/L · Médiane 0,15',
+    'ru': '×10⁹/L · Медиана 0,15',
+    'es': '×10⁹/L · Mediana 0,15',
+    'ar': '×10⁹/L · الوسيط 0.15',
+    'de': '×10⁹/L · Median 0,15',
+    'ja': '×10⁹/L · 中央値 0.15',
+    'ko': '×10⁹/L · 중앙값 0.15',
+  },
+  hint_ELR: {
+    'zh': '中位数 0.09',
+    'en': 'Median 0.09',
+    'vi': 'Trung vị 0,09',
+    'th': 'ค่ามัธยฐาน 0.09',
+    'id': 'Median 0,09',
+    'fr': 'Médiane 0,09',
+    'ru': 'Медиана 0,09',
+    'es': 'Mediana 0,09',
+    'ar': 'الوسيط 0.09',
+    'de': 'Median 0,09',
+    'ja': '中央値 0.09',
+    'ko': '중앙값 0.09',
+  },
+  hint_HCT: {
+    'zh': '% · 中位数 38.0',
+    'en': '% · Median 38.0',
+    'vi': '% · Trung vị 38,0',
+    'th': '% · ค่ามัธยฐาน 38.0',
+    'id': '% · Median 38,0',
+    'fr': '% · Médiane 38,0',
+    'ru': '% · Медиана 38,0',
+    'es': '% · Mediana 38,0',
+    'ar': '% · الوسيط 38.0',
+    'de': '% · Median 38,0',
+    'ja': '% · 中央値 38.0',
+    'ko': '% · 중앙값 38.0',
+  },
+  hint_LYMPH: {
+    'zh': '×10⁹/L · 中位数 1.71',
+    'en': '×10⁹/L · Median 1.71',
+    'vi': '×10⁹/L · Trung vị 1,71',
+    'th': '×10⁹/L · ค่ามัธยฐาน 1.71',
+    'id': '×10⁹/L · Median 1,71',
+    'fr': '×10⁹/L · Médiane 1,71',
+    'ru': '×10⁹/L · Медиана 1,71',
+    'es': '×10⁹/L · Mediana 1,71',
+    'ar': '×10⁹/L · الوسيط 1.71',
+    'de': '×10⁹/L · Median 1,71',
+    'ja': '×10⁹/L · 中央値 1.71',
+    'ko': '×10⁹/L · 중앙값 1.71',
+  },
+  hint_MCV: {
+    'zh': 'fL · 中位数 86.9',
+    'en': 'fL · Median 86.9',
+    'vi': 'fL · Trung vị 86,9',
+    'th': 'fL · ค่ามัธยฐาน 86.9',
+    'id': 'fL · Median 86,9',
+    'fr': 'fL · Médiane 86,9',
+    'ru': 'fL · Медиана 86,9',
+    'es': 'fL · Mediana 86,9',
+    'ar': 'fL · الوسيط 86.9',
+    'de': 'fL · Median 86,9',
+    'ja': 'fL · 中央値 86.9',
+    'ko': 'fL · 중앙값 86.9',
+  },
+  hint_PLR: {
+    'zh': '中位数 156.9',
+    'en': 'Median 156.9',
+    'vi': 'Trung vị 156,9',
+    'th': 'ค่ามัธยฐาน 156.9',
+    'id': 'Median 156,9',
+    'fr': 'Médiane 156,9',
+    'ru': 'Медиана 156,9',
+    'es': 'Mediana 156,9',
+    'ar': 'الوسيط 156.9',
+    'de': 'Median 156,9',
+    'ja': '中央値 156.9',
+    'ko': '중앙값 156.9',
+  },
+  hint_BASO: {
+    'zh': '×10⁹/L · 中位数 0.03',
+    'en': '×10⁹/L · Median 0.03',
+    'vi': '×10⁹/L · Trung vị 0,03',
+    'th': '×10⁹/L · ค่ามัธยฐาน 0.03',
+    'id': '×10⁹/L · Median 0,03',
+    'fr': '×10⁹/L · Médiane 0,03',
+    'ru': '×10⁹/L · Медиана 0,03',
+    'es': '×10⁹/L · Mediana 0,03',
+    'ar': '×10⁹/L · الوسيط 0.03',
+    'de': '×10⁹/L · Median 0,03',
+    'ja': '×10⁹/L · 中央値 0.03',
+    'ko': '×10⁹/L · 중앙값 0.03',
+  },
+  hint_WBC: {
+    'zh': '×10⁹/L · 中位数 6.42',
+    'en': '×10⁹/L · Median 6.42',
+    'vi': '×10⁹/L · Trung vị 6,42',
+    'th': '×10⁹/L · ค่ามัธยฐาน 6.42',
+    'id': '×10⁹/L · Median 6,42',
+    'fr': '×10⁹/L · Médiane 6,42',
+    'ru': '×10⁹/L · Медиана 6,42',
+    'es': '×10⁹/L · Mediana 6,42',
+    'ar': '×10⁹/L · الوسيط 6.42',
+    'de': '×10⁹/L · Median 6,42',
+    'ja': '×10⁹/L · 中央値 6.42',
+    'ko': '×10⁹/L · 중앙값 6.42',
+  },
+};
+const FIELDS = [{"key": "NLR", "def": "2.14"}, {"key": "EO", "def": "0.15"}, {"key": "ELR", "def": "0.09"}, {"key": "HCT", "def": "38.0"}, {"key": "LYMPH", "def": "1.71"}, {"key": "MCV", "def": "86.9"}, {"key": "PLR", "def": "156.9"}, {"key": "BASO", "def": "0.03"}, {"key": "WBC", "def": "6.42"}];
+const LANGS = ['zh', 'en', 'vi', 'th', 'id', 'fr', 'ru', 'es', 'ar', 'de', 'ja', 'ko'];
+const LANG_LABELS = {"zh": "中文", "en": "English", "vi": "Tiếng Việt", "th": "ไทย", "id": "Indonesia", "fr": "Français", "ru": "Русский", "es": "Español", "ar": "العربية", "de": "Deutsch", "ja": "日本語", "ko": "한국어"};
+const RTL = new Set(['ar']);
+
+const MODEL = {
+  intercept: 2.836023415,
+  coefs: {
+    NLR:   0.9309563515,
+    EO:    5.6821905693,
+    ELR:   5.8953811739,
+    HCT:  -0.1114284394,
+    LYMPH: 0.3322135703,
+    MCV:  -0.032676241,
+    PLR:   0.00586547,
+    BASO: -25.5452753258,
+    WBC:   0.0283664072
+  }
+};
+const CUTOFF = 0.472;
+
+const inputsEl = document.getElementById('inputs');
+FIELDS.forEach(f => {
+  const div = document.createElement('div');
+  div.className = 'field';
+  div.innerHTML =
+    `<div class="field-header">
+       <span class="field-label" data-i18n="fld_${f.key}"></span>
+       <span class="field-hint" data-i18n="hint_${f.key}"></span>
+     </div>
+     <input type="number" step="any" min="0" id="in_${f.key}" placeholder="${f.def}">`;
+  inputsEl.appendChild(div);
+});
+
+function t(key, lang){ return (I18N[key] && I18N[key][lang]) || I18N[key].en || key; }
+function fillNodes(lang){
+  document.querySelectorAll('[data-i18n]').forEach(el=>{
+    el.textContent = t(el.getAttribute('data-i18n'), lang);
+  });
+  document.title = t('docTitle',lang) + ' | ' + t('subtitle',lang);
+  const bar = document.getElementById('langbar');
+  bar.innerHTML = '';
+  LANGS.forEach(L=>{
+    const b = document.createElement('button');
+    b.textContent = LANG_LABELS[L];
+    b.dataset.lang = L;
+    if (L===lang) b.className='on';
+    b.addEventListener('click', ()=> setLang(L));
+    bar.appendChild(b);
+  });
+  document.getElementById('cutoffBadge').textContent = t('cutoffLabel',lang) + ' 0.472';
+  document.getElementById('btnCalc').textContent = t('btnCalc', lang);
+  document.getElementById('btnDemo').textContent = t('btnDemo', lang);
+  document.getElementById('btnClear').textContent = t('btnClear', lang);
+  document.documentElement.setAttribute('dir', RTL.has(lang) ? 'rtl' : 'ltr');
+  document.documentElement.setAttribute('lang', lang);
+  document.documentElement.setAttribute('data-lang', lang);
+}
+function setLang(lang){ fillNodes(lang); }
+
+function fillDemo(){
+  FIELDS.forEach(f => document.getElementById('in_'+f.key).value = f.def);
+}
+function clearAll(){
+  FIELDS.forEach(f => document.getElementById('in_'+f.key).value = '');
+  document.getElementById('result').classList.remove('show');
+}
+
+function predict(){
+  const lang = document.documentElement.getAttribute('data-lang') || 'zh';
+  const contributions = {};
+  let allFilled = true;
+  let logit = MODEL.intercept;
+  FIELDS.forEach(f=>{
+    const v = parseFloat(document.getElementById('in_'+f.key).value);
+    if (isNaN(v)){ allFilled = false; return; }
+    contributions[f.key] = v * MODEL.coefs[f.key];
+  });
+  if (!allFilled){ alert(t('alertMissing', lang)); return; }
+
+  Object.values(contributions).forEach(c => logit += c);
+  const p = 1 / (1 + Math.exp(-logit));
+  const probPct = (p*100).toFixed(1);
+
+  document.getElementById('probNum').textContent = probPct + '%';
+  const badge = document.getElementById('riskBadge');
+  if (p >= CUTOFF){
+    badge.textContent = t('riskHigh', lang);
+    badge.className = 'risk-badge risk-high';
+  } else if (p >= 0.30){
+    badge.textContent = t('riskMid', lang);
+    badge.className = 'risk-badge risk-mid';
+  } else {
+    badge.textContent = t('riskLow', lang);
+    badge.className = 'risk-badge risk-low';
+  }
+
+  const fill = document.getElementById('gaugeFill');
+  fill.style.left = Math.min(p*100, 99.5) + '%';
+
+  const interp = document.getElementById('interp');
+  if (p >= CUTOFF){
+    interp.textContent = t('interpHigh', lang).replace('{p}', probPct).replace('{c}', '47.2');
+  } else {
+    interp.textContent = t('interpLow', lang).replace('{p}', probPct).replace('{c}', '47.2');
+  }
+
+  const maxAbs = Math.max(...Object.values(contributions).map(Math.abs), 0.001);
+  const rowsEl = document.getElementById('contribRows');
+  rowsEl.innerHTML = '';
+  Object.keys(contributions).sort((a,b)=>Math.abs(contributions[b])-Math.abs(contributions[a]))
+    .forEach(k=>{
+      const c = contributions[k];
+      const w = Math.abs(c)/maxAbs * 50;
+      const shortName = (k==='EO'?'EO#':k==='LYMPH'?'LYMPH#':k==='BASO'?'BASO#':k);
+      const row = document.createElement('div');
+      row.className = 'crow';
+      row.innerHTML =
+        `<span class="name">${shortName}</span>
+         <div class="track"><div class="bar ${c>=0?'pos':'neg'}" style="width:${w}%"></div></div>
+         <span class="val">${c>=0?'+':''}${c.toFixed(3)}</span>`;
+      rowsEl.appendChild(row);
+    });
+
+  document.getElementById('result').classList.add('show');
+  document.getElementById('result').scrollIntoView({behavior:'smooth', block:'nearest'});
+}
+
+fillNodes('zh');
+</script>
+</body>
+</html>
